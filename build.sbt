@@ -5,7 +5,6 @@ assemblyMergeStrategy in assembly := {
   case x => MergeStrategy.first
 }
 
-
 lazy val root = (project in file(".")).
   settings(
     inThisBuild(List(
