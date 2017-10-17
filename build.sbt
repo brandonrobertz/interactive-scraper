@@ -5,6 +5,7 @@ assemblyMergeStrategy in assembly := {
   case x => MergeStrategy.first
 }
 
+
 lazy val root = (project in file(".")).
   settings(
     inThisBuild(List(
@@ -14,6 +15,7 @@ lazy val root = (project in file(".")).
     )),
     name := "InteractiveParser",
     libraryDependencies ++= Seq(
-      "org.apache.nutch" % "nutch" % "1.13"
-    )
+      "org.apache.nutch" % "nutch" % "1.13",
+    ),
+    scalacOptions += "-feature"
   )
