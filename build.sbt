@@ -12,9 +12,10 @@ lazy val root = (project in file(".")).
       scalaVersion := "2.12.3",
       version      := "0.0.2"
     )),
-    name := "InteractiveParser",
+    name := "InteractiveCrawler",
     libraryDependencies ++= Seq(
       "org.apache.nutch" % "nutch" % "1.13",
+      "org.seleniumhq.selenium" % "selenium-java" % "3.6.0",
     ),
     scalacOptions += "-feature"
   )
