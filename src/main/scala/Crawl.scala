@@ -1,14 +1,20 @@
 package org.bxroberts.interactivescraper
 
 import collection.mutable.HashMap
+
 import java.lang.Thread
-import java.util.List
+import java.net.URL
+
 import org.openqa.selenium.By
 import org.openqa.selenium.WebDriver
 import org.openqa.selenium.WebElement
 import org.openqa.selenium.NoSuchElementException
 import org.openqa.selenium.support.ui.ExpectedCondition
 import org.openqa.selenium.support.ui.WebDriverWait
+
+import scala.xml.XML
+import org.jsoup.Jsoup
+
 
 class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
   var inputType: String = conf("input-type")
@@ -73,53 +79,101 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
     visitedLinks += url
   }
 
-  def unclickedLinkIndex(links: List[WebElement]): Int = {
-    for( i <- 0 to links.size) {
-      var link = links.get(i)
-      var url = link.getAttribute("href")
-      if (!visitedLinks.contains(url)) {
-        return i;
-      }
-    }
-    return -1;
+  def getHref(link: WebElement): String = {
+    val source = link.getAttribute("outerHTML")
+    return Jsoup
+      .parse(source)
+      .getElementsByTag("a")
+      .attr("href")
   }
 
-  def findInteractiveFormPage() {
-    println("findInteractiveFormPage")
-    // check if url is a searchable interactive form
-    // possibly use a ML model to decide in the future
-    var links = driver.findElements(By.tagName("a"))
-    println(s"Got links $links")
+  def goodLink(href: String): Boolean = {
+    val thisHost = new URL(href).getHost
+    val baseHost = new URL(baseUrl).gethost
+    return !href.contains("mailto:") && thisHost == baseHost
+  }
 
-    var ix: Int = unclickedLinkIndex(links)
-    println(s"Unclicked $ix")
-    var link = links.get(ix)
+  /**
+   * Extract all the by links from our page so
+   * we can look them up at a later time given
+   * that the driver instance will not be the same
+   * one after recursion.
+   *
+   * TODO: take raw page HTML and extract real
+   * links, selenium is interpreting them in a
+   * manner which doesn't allow us to re-search
+   * and find them. I.e., if anchor href is
+   * "//bxroberts.org" the result of getAttribute("href")
+   * will return https://bxroberts.org/
+   */
+  def extractPageLinks(): List[By] = {
+    var selectors: List[By] = List()
+    val links = driver.findElements(By.tagName("a"))
+    links.forEach( link => {
+      println(s"Link $link")
+      val href = getHref(link)
+      if (goodLink(href)) {
+        val selector = By.cssSelector(s"""a[href="${href}"]""")
+        selectors = selectors ++ List(selector)
+      }
+    })
+    return selectors
+  }
 
-    var url = link.getAttribute("href")
-    var linkText = link.getText()
-
-    println(s"Clicking Url $url Text $linkText")
+  def clickLink(link: WebElement) {
     try {
       link.click()
     } catch {
-      case e => {
-        println(s"Error $e")
-        addLink(url)
-        return
+      case e: Throwable => println(s"Error clicking $link: $e")
+    }
+  }
+
+  def findLink(by: By): WebElement = {
+    var link: WebElement = null
+    try {
+      link = driver.findElement(by)
+    } catch {
+      case e: Throwable => println(s"Error finding link by $by: $e")
+    }
+    return link
+  }
+
+  def findInteractiveFormPage() {
+   var title = driver.getTitle
+    println(s"findInteractiveFormPage Title: $title")
+    addLink(driver.getCurrentUrl)
+
+    // check if url is a searchable interactive form
+    // possibly use a ML model to decide in the future
+
+    //driver.navigate.refresh()
+    val byLinks: List[By] = extractPageLinks()
+    println(s"List[By] = $byLinks")
+
+    for (by <- byLinks) {
+      var link = findLink(by)
+
+      if (link != null) {
+        var url = getHref(link)
+        println(s"Extracted url $url")
+        var pUrl = link.getAttribute("href")
+        print(s"Extracted url $url parsed $pUrl")
+
+        if (!visitedLinks.contains(url)) {
+          addLink(url)
+
+          println(s"Clicking link $url")
+          clickLink(link)
+          findInteractiveFormPage()
+
+          println(s"Link $link")
+          driver.navigate.back()
+        }
       }
     }
 
-    println("Sleeping")
-    Thread.sleep(500)
-
-    addLink(url)
-
-    println("Recursing into page")
-    findInteractiveFormPage()
-
-    println("Going back")
-    driver.navigate.back()
-    Thread.sleep(500)
+    println("Going back...")
+    //driver.navigate.back()
   }
 
   def run() {

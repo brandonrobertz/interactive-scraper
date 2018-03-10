@@ -16,6 +16,8 @@ lazy val root = (project in file(".")).
     libraryDependencies ++= Seq(
       "org.apache.nutch" % "nutch" % "1.13",
       "org.seleniumhq.selenium" % "selenium-java" % "3.6.0",
+      "org.scala-lang.modules" % "scala-xml_2.12" % "1.0.6",
+      "org.jsoup" % "jsoup" % "1.8.3",
     ),
     scalacOptions += "-feature"
   )
