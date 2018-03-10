@@ -1,13 +1,10 @@
 package org.bxroberts.interactivescraper
 
-import org.bxroberts.interactivescraper.Scraper
-
+import org.bxroberts.interactivescraper.Crawl
 import collection.mutable.HashMap
-
-import java.util.concurrent.TimeUnit;
-
+import java.util.concurrent.TimeUnit
 import org.openqa.selenium.By
-import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeDriver
 import org.openqa.selenium.JavascriptExecutor
 import org.openqa.selenium.WebDriver
 import org.openqa.selenium.WebElement
@@ -61,7 +58,7 @@ object InteractiveCrawler {
   def scrapeSite(url: String, conf: HashMap[String,String]) {
     println(s"Base URL $url Config: $conf")
     var driver: WebDriver = getDriver()
-    var scraper = new Scraper(url, conf, driver)
+    var scraper = new Crawl(url, conf, driver)
     scraper run()
     closeDriver(driver)
   }
