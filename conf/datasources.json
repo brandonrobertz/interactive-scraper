@@ -1,0 +1,26 @@
+{
+  "http://registrar.utexas.edu/students/degrees/verify": {
+    "input-type": "character-1",
+  },
+  "http://reg.tmb.state.tx.us/OnLineVerif/Phys_NoticeVerif.asp": {
+    "input-type": "character-1",
+    "wildcard-type": "*",
+  },
+  "http://www.traviscountyclerk.org": {
+    "input-type": "character-2",
+    "wildcard-type": "*",
+    "note": "multiple searches on site. need to find & identify path to them",
+  },
+  "http://www.traviscountyclerk.org/eclerk/Category.do?code=R.17": {
+    "input-type": "character-1",
+  },
+  "http://www.texasbar.com": {
+    "input-type": "character-1",
+  },
+  "http://www.traviscad.org/tcad_search.php?mode=name&kind=real": {
+    "input-type": "character-1",
+  },
+  "http://www.traviscountytax.org": {
+    "input-type": "character-2",
+  }
+}

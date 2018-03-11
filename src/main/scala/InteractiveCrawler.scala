@@ -11,39 +11,28 @@ import org.openqa.selenium.WebElement
 import org.openqa.selenium.support.ui.WebDriverWait
 import org.openqa.selenium.io.TemporaryFilesystem
 
+import org.json4s.native.JsonParser
+
 object InteractiveCrawler {
   // Interactive Searchable
+  // TODO: make these commandline arguments
   var scrapeInfo: HashMap[String,HashMap[String,String]] = HashMap(
     "https://bxroberts.org/" -> HashMap(
       "input-type" -> "character-2",
-      "wildcard-type" -> "%"))
-/*
+      "wildcard-type" -> "%"
+    ),
     "http://registrar.utexas.edu/students/degrees/verify" -> HashMap(
-      "input-type" -> "character-1"),
-    "http://reg.tmb.state.tx.us/OnLineVerif/Phys_NoticeVerif.asp" -> HashMap(
       "input-type" -> "character-1",
-      "wildcard-type" -> "*"),
+    )
+  )
 
-    "http://traviscountyclerk.org/apex/f?p=137:10:0::NO" -> HashMap(
-      "input-type" -> "character-1",
-      "wildcard-type" -> "%"),
-
-    "http://www.texasbar.com" -> HashMap(
-      "input-type" -> "character-1"),
-
-    "http://www.traviscad.org/tcad_search.php?mode=name&kind=real" -> HashMap(
-      "input-type" -> "character-1"),
-
-    "http://www.traviscountyclerk.org/eclerk/Category.do?code=R.17" -> HashMap(
-      "input-type" -> "character-1"),
-
-    "http://www.traviscountytax.org" -> HashMap(
-      "input-type" -> "character-2"),
-
-    "http://www.traviscountyclerk.org" -> HashMap(
-      "input-type" -> "character-1",
-      "wildcard-type" -> "*"))
-*/
+  def loadData(): HashMap[String,HashMap[String,String]] = {
+    val filename = "conf/datasources.json"
+    val data = scala.io.Source.fromFile(filename).mkString
+    var parsed = JsonParser.parse(data)
+    println(parsed)
+    return scrapeInfo
+  }
 
   def getDriver(): WebDriver = {
     return new ChromeDriver()

@@ -12,7 +12,6 @@ import org.openqa.selenium.NoSuchElementException
 import org.openqa.selenium.support.ui.ExpectedCondition
 import org.openqa.selenium.support.ui.WebDriverWait
 
-import scala.xml.XML
 import org.jsoup.Jsoup
 
 
@@ -20,6 +19,7 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
   var inputType: String = conf("input-type")
   var charRange = 'a' to 'z'
   var visitedLinks: Set[String] = Set()
+  val MAX_DEPTH = 5
 
   /**
    * Extract chars from a character-based input type.
@@ -88,13 +88,29 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
   }
 
   def goodLink(href: String, link: WebElement): Boolean = {
+    val rawHref = link.getAttribute("href")
+    //println(s"checking for good link $href raw $rawHref")
+    // only use visible links
+    if (!link.isEnabled || !link.isDisplayed)
+      return false
+
+    // ignore strange protocols
+    if (href.contains("mailto:") || href.startsWith("tel:"))
+      return false
+
+    // make sure we're not leaving the host
     val proto = new URL(driver.getCurrentUrl()).getProtocol
     val baseHost = new URL(baseUrl).getHost
-    val rawHref = link.getAttribute("href")
-    if (rawHref == null || rawHref.isEmpty) return false
-    println(s"checking for good link $href raw $rawHref")
+    if (rawHref == null || rawHref.isEmpty) {
+      println("skipping empty href")
+      return false
+    }
     var thisHost = new URL(rawHref).getHost
-    return (!href.contains("mailto:")) && (thisHost == baseHost)
+    val sameHost = thisHost == baseHost
+    if (!sameHost)
+      println(s"Not same host this: $thisHost base: $baseHost")
+
+    return sameHost
   }
 
   /**
@@ -124,12 +140,15 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
     return selectors
   }
 
-  def clickLink(link: WebElement) {
+  def clickLink(link: WebElement): Boolean = {
     try {
       link.click()
+      Thread.sleep(2000)
+      return true
     } catch {
       case e: Throwable => println(s"Error clicking $link: $e")
     }
+    return false
   }
 
   def findLink(by: By): WebElement = {
@@ -142,7 +161,7 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
     return link
   }
 
-  def findInteractiveFormPage() {
+  def findInteractiveFormPage(depth: Int = 0) {
    var title = driver.getTitle
     println(s"findInteractiveFormPage Title: $title")
     addLink(driver.getCurrentUrl)
@@ -166,17 +185,16 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
         if (!visitedLinks.contains(url)) {
           addLink(url)
 
-          println(s"Clicking link $url")
-          clickLink(link)
-          findInteractiveFormPage()
-
-          println(s"Link $link")
-          driver.navigate.back()
+         if(depth < MAX_DEPTH && clickLink(link)) {
+           println(s"***** Clicked link $url")
+           findInteractiveFormPage(depth + 1)
+           println("Going back...")
+           driver.navigate.back()
+          }
         }
       }
     }
 
-    println("Going back...")
     //driver.navigate.back()
   }
 
