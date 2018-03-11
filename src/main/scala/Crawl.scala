@@ -87,10 +87,14 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
       .attr("href")
   }
 
-  def goodLink(href: String): Boolean = {
-    val thisHost = new URL(href).getHost
-    val baseHost = new URL(baseUrl).gethost
-    return !href.contains("mailto:") && thisHost == baseHost
+  def goodLink(href: String, link: WebElement): Boolean = {
+    val proto = new URL(driver.getCurrentUrl()).getProtocol
+    val baseHost = new URL(baseUrl).getHost
+    val rawHref = link.getAttribute("href")
+    if (rawHref == null || rawHref.isEmpty) return false
+    println(s"checking for good link $href raw $rawHref")
+    var thisHost = new URL(rawHref).getHost
+    return (!href.contains("mailto:")) && (thisHost == baseHost)
   }
 
   /**
@@ -112,7 +116,7 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
     links.forEach( link => {
       println(s"Link $link")
       val href = getHref(link)
-      if (goodLink(href)) {
+      if (goodLink(href, link)) {
         val selector = By.cssSelector(s"""a[href="${href}"]""")
         selectors = selectors ++ List(selector)
       }
