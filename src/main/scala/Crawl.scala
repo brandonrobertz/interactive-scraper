@@ -19,7 +19,7 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
   var inputType: String = conf("input-type")
   var charRange = 'a' to 'z'
   var visitedLinks: Set[String] = Set()
-  val MAX_DEPTH = 5
+  val MAX_DEPTH = 20
 
   /**
    * Extract chars from a character-based input type.
@@ -98,6 +98,10 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
     if (href.contains("mailto:") || href.startsWith("tel:"))
       return false
 
+    val tar = link.getAttribute("target")
+    if (tar == "_new" || tar == "_blank")
+      return false
+
     // make sure we're not leaving the host
     val proto = new URL(driver.getCurrentUrl()).getProtocol
     val baseHost = new URL(baseUrl).getHost
@@ -114,23 +118,19 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
   }
 
   /**
-   * Extract all the by links from our page so
-   * we can look them up at a later time given
-   * that the driver instance will not be the same
-   * one after recursion.
+   * Extract all the by links from our page so we can look them up at a later
+   * time given that the driver instance will not be the same one after
+   * recursion.
    *
-   * TODO: take raw page HTML and extract real
-   * links, selenium is interpreting them in a
-   * manner which doesn't allow us to re-search
-   * and find them. I.e., if anchor href is
-   * "//bxroberts.org" the result of getAttribute("href")
-   * will return https://bxroberts.org/
+   * NOTE: selenium is interpreting href attributes in a
+   * manner which doesn't allow us to find them. I.e., if anchor
+   * href is "//bxroberts.org" the result of getAttribute("href") will
+   * return https://bxroberts.org/
    */
   def extractPageLinks(): List[By] = {
     var selectors: List[By] = List()
     val links = driver.findElements(By.tagName("a"))
     links.forEach( link => {
-      println(s"Link $link")
       val href = getHref(link)
       if (goodLink(href, link)) {
         val selector = By.cssSelector(s"""a[href="${href}"]""")
@@ -163,7 +163,7 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
 
   def findInteractiveFormPage(depth: Int = 0) {
    var title = driver.getTitle
-    println(s"findInteractiveFormPage Title: $title")
+    println(s"findInteractiveFormPage Title: $title Depth: $depth")
     addLink(driver.getCurrentUrl)
 
     // check if url is a searchable interactive form
@@ -171,7 +171,6 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
 
     //driver.navigate.refresh()
     val byLinks: List[By] = extractPageLinks()
-    println(s"List[By] = $byLinks")
 
     for (by <- byLinks) {
       var link = findLink(by)
@@ -179,8 +178,6 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
       if (link != null) {
         var url = getHref(link)
         println(s"Extracted url $url")
-        var pUrl = link.getAttribute("href")
-        print(s"Extracted url $url parsed $pUrl")
 
         if (!visitedLinks.contains(url)) {
           addLink(url)
