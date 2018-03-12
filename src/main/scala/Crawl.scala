@@ -5,6 +5,7 @@ import collection.mutable.ListBuffer
 
 import java.lang.Thread
 import java.net.URL
+import java.util.concurrent.TimeUnit
 
 import org.openqa.selenium.By
 import org.openqa.selenium.WebDriver
@@ -20,7 +21,16 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
   var inputType: String = conf("input-type")
   var charRange = 'a' to 'z'
   var visitedLinks: Set[String] = Set()
-  val MAX_DEPTH = 20
+  val MAX_DEPTH = 2000
+
+  /**
+   * Run a function that navigates the driver and
+   * wait for the page to load. This is just a wrapper.
+   */
+  def loadAndWait(fn: () => Unit) {
+    fn()
+    driver.manage().timeouts().pageLoadTimeout(10, TimeUnit.SECONDS)
+  }
 
   /**
    * Extract chars from a character-based input type.
@@ -184,8 +194,7 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
 
   def clickLink(link: WebElement): Boolean = {
     try {
-      link.click()
-      Thread.sleep(2000)
+      loadAndWait(link.click)
       return true
     } catch {
       case e: Throwable => println(s"Error clicking $link: $e")
@@ -239,7 +248,7 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
             println(s"***** Clicked link $url")
             crawlUntilCondition(stopCond, getLinks, depth = depth + 1)
             println("Going back...")
-            driver.navigate.back()
+            loadAndWait(driver.navigate.back)
           }
         }
       }
@@ -267,6 +276,11 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
     // with the proper form
     crawlUntilCondition(condGoodFormsFound, extractPageLinks)
 
+    // TODO: abstract this into another function, basically
+    // we want to have a doAction method that looks at the
+    // document and decides whether to search for a new form,
+    // begin a query on a form from the current page, follow
+    // paginated data pages, and end the crawl
     println("Crawling form...")
     var formIds = scrapableForms()
     for (formId <- formIds) {
@@ -277,11 +291,9 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
         println(s"Form $formId Entering keys $i into $inputId")
         inp.clear()
         inp.sendKeys(i)
-        inp.submit()
+        loadAndWait(inp.submit)
         crawlUntilCondition(condNextButtonFound, extractNavigationButtons)
-        Thread.sleep(1500)
-        driver.navigate.back()
-        Thread.sleep(1500)
+        loadAndWait(driver.navigate.back)
       }
     }
 
