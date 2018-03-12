@@ -60,7 +60,7 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
 
     inputElements.forEach(input => {
       val name = input.getAttribute("name")
-      println(s"Checking input $name")
+      // println(s"Checking input $name")
       val iType = input.getAttribute("type")
 
       if (input.isDisplayed && input.isEnabled && iType == "text") {
@@ -172,6 +172,16 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
     return selectors
   }
 
+  def extractNavigationButtons(): ListBuffer[By] = {
+    var buttons: ListBuffer[By] = ListBuffer()
+    driver.findElements(By.xpath("//input[@type='button']")).forEach( b => {
+      val btnText = b.getAttribute("value").toLowerCase
+      if (btnText.contains("next"))
+        buttons.append(By.id(b.getAttribute("id")))
+    })
+    return buttons
+  }
+
   def clickLink(link: WebElement): Boolean = {
     try {
       link.click()
@@ -193,19 +203,27 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
     return link
   }
 
-  def crawlUntilCondition(stopCond: () => Boolean, depth: Int = 0) {
-   var title = driver.getTitle
+  // TODO: ensure tail recursion here, this would mean
+  // putting the back command before the recursion
+  def crawlUntilCondition(stopCond: () => Boolean,
+    getLinks: () => ListBuffer[By], depth: Int = 0)
+  {
+    var title = driver.getTitle
     println(s"findInteractiveFormPage Title: $title Depth: $depth")
-    addLink(driver.getCurrentUrl)
+    // addLink(driver.getCurrentUrl)
 
     // check if url is a searchable interactive form
     // possibly use a ML model to decide in the future
     if (stopCond()) {
+      println("Stopping condition met. Stopping crawl.")
       return
     }
 
-    //driver.navigate.refresh()
-    val byLinks = extractPageLinks()
+    // TODO: order links by some metric and click in
+    // that order, i.e., next button should get clicked
+    // first if we're on a post-form submit page
+    val byLinks = getLinks()
+    println(s"Found links $byLinks")
 
     for (by <- byLinks) {
       var link = findLink(by)
@@ -215,22 +233,30 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
         println(s"Extracted url $url")
 
         if (!visitedLinks.contains(url)) {
-          addLink(url)
+          // addLink(url)
 
-         if(depth < MAX_DEPTH && clickLink(link)) {
-           println(s"***** Clicked link $url")
-           crawlUntilCondition(stopCond, depth + 1)
-           println("Going back...")
-           driver.navigate.back()
+          if(depth < MAX_DEPTH && clickLink(link)) {
+            println(s"***** Clicked link $url")
+            crawlUntilCondition(stopCond, getLinks, depth = depth + 1)
+            println("Going back...")
+            driver.navigate.back()
           }
         }
       }
     }
   }
 
-  def goodFormsFound(): Boolean = {
+  def condGoodFormsFound(): Boolean = {
     var forms = scrapableForms()
     return forms.size > 0
+  }
+
+  def condNextButtonFound(): Boolean = {
+    return extractNavigationButtons.size == 0
+  }
+
+  def condErrorFound(): Boolean = {
+    return driver.findElements(By.className("error")).size > 0
   }
 
   def run() {
@@ -239,8 +265,9 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
 
     // run findInteractiveFormPage, it will navigate to the page
     // with the proper form
-    crawlUntilCondition(goodFormsFound)
+    crawlUntilCondition(condGoodFormsFound, extractPageLinks)
 
+    println("Crawling form...")
     var formIds = scrapableForms()
     for (formId <- formIds) {
       for (i <- inputs) {
@@ -251,6 +278,7 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
         inp.clear()
         inp.sendKeys(i)
         inp.submit()
+        crawlUntilCondition(condNextButtonFound, extractNavigationButtons)
         Thread.sleep(1500)
         driver.navigate.back()
         Thread.sleep(1500)
