@@ -49,40 +49,57 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
   }
 
   /**
+   * Take a form and extract a list of ids which
+   * we can use to look up inputs which we need
+   * to enter information into. Return id/paths
+   * to avoid stale references.
+   */
+  def getInputs(form: WebElement): ListBuffer[String] = {
+    var inputIds: ListBuffer[String] = ListBuffer()
+    val inputElements = form.findElements(By.tagName("input"))
+
+    inputElements.forEach(input => {
+      val name = input.getAttribute("name")
+      println(s"Checking input $name")
+      val iType = input.getAttribute("type")
+
+      if (input.isDisplayed && input.isEnabled && iType == "text") {
+        val id = input.getAttribute("id")
+        println(s"Adding input $id")
+        inputIds.append(id)
+      }
+    })
+
+    return inputIds
+  }
+
+  def formVisible(form: WebElement): Boolean = {
+    return form.isEnabled && form.isDisplayed
+  }
+
+  /**
    * If there are multiple forms on a page, determine which
    * one we want to use. Return the ID of the form to use
    */
-  def scrapableForms(): ListBuffer[WebElement] = {
-    var forms: ListBuffer[WebElement] = ListBuffer()
-    var fElements = driver.findElements(By.tagName("form"))
-    println(s"fElements $fElements")
-    fElements.forEach(form => {
-      if (form.isEnabled && form.isDisplayed) {
+  def scrapableForms(): ListBuffer[String] = {
+    var formIds: ListBuffer[String] = ListBuffer()
+
+    var formElements = driver.findElements(By.tagName("form"))
+    println(s"fElements $formElements")
+
+    formElements.forEach(form => {
+      if (formVisible(form)) {
         println(s"Evaluating form $form")
-        val inputs = form.findElements(By.tagName("input"))
-        val firstIName = inputs.get(0).getAttribute("name")
-
-        println(s"Inputs $inputs")
-        println(s"firstIName $firstIName")
-
-        if (inputs.size == 1 && inputs.get(0).isDisplayed) {
-          println(s"Adding form $form")
-          forms.append(form)
-        } else {
-          inputs.forEach(inp => {
-            val iName = inp.getAttribute("name")
-            println(s"Checking input $iName")
-
-            val vis = inp.isDisplayed && inp.isEnabled
-            if (vis && iName.contains("name") && !forms.contains(form)) {
-              println(s"Adding form $form")
-              forms.append(form)
-            }
-          })
+        val formId = form.getAttribute("id")
+        val inputs = getInputs(form)
+        if (inputs.size > 0) {
+          println(s"Inputs $inputs")
+          formIds.append(formId)
         }
       }
     })
-    return forms
+
+    return formIds
   }
 
   def addLink(url: String) {
@@ -209,8 +226,6 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
         }
       }
     }
-
-    //driver.navigate.back()
   }
 
   def goodFormsFound(): Boolean = {
@@ -226,19 +241,21 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
     // with the proper form
     crawlUntilCondition(goodFormsFound)
 
-    // var forms = scrapableForms()
-    // for (form <- forms) {
-    //   println(s"Form $form")
-    //   for (i <- inputs) {
-    //     val inp = form.findElement(By.tagName("input"))
-    //     println(s"Input $inp")
-    //     inp.sendKeys(i)
-    //     inp.submit()
-    //     Thread.sleep(1500)
-    //     driver.navigate.back()
-    //   }
-    // }
-
+    var formIds = scrapableForms()
+    for (formId <- formIds) {
+      for (i <- inputs) {
+        val form = driver.findElement(By.id(formId))
+        var inputId = getInputs(form)(0)
+        var inp = form.findElement(By.id(inputId))
+        println(s"Form $formId Entering keys $i into $inputId")
+        inp.clear()
+        inp.sendKeys(i)
+        inp.submit()
+        Thread.sleep(1500)
+        driver.navigate.back()
+        Thread.sleep(1500)
+      }
+    }
 
     // if there are multiple forms on the page, run the desiredFormInPage
     // which will determine which form to interact with
