@@ -1,6 +1,7 @@
 package org.bxroberts.interactivescraper
 
 import collection.mutable.HashMap
+import collection.mutable.ListBuffer
 
 import java.lang.Thread
 import java.net.URL
@@ -51,27 +52,37 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
    * If there are multiple forms on a page, determine which
    * one we want to use. Return the ID of the form to use
    */
-  def desiredFormInPage(): String = {
-    try {
-      var e: WebElement = driver.findElement(By.name("form"))
-      println("WebElement", e);
-      return e.getAttribute("id")
-    } catch {
-      case e: NoSuchElementException => return ""
-    }
-  }
+  def scrapableForms(): ListBuffer[WebElement] = {
+    var forms: ListBuffer[WebElement] = ListBuffer()
+    var fElements = driver.findElements(By.tagName("form"))
+    println(s"fElements $fElements")
+    fElements.forEach(form => {
+      if (form.isEnabled && form.isDisplayed) {
+        println(s"Evaluating form $form")
+        val inputs = form.findElements(By.tagName("input"))
+        val firstIName = inputs.get(0).getAttribute("name")
 
-  def getPage(f: () => Unit) {
-    Thread.sleep(3000)
-    println("running")
-    f()
-    /*
-    val myDynamicElement = new WebDriverWait(driver, 10).until(
-      new ExpectedCondition[WebElement] {
-        override def apply(d: WebDriver) = d.findElement(By.tagName("body"))
+        println(s"Inputs $inputs")
+        println(s"firstIName $firstIName")
+
+        if (inputs.size == 1 && inputs.get(0).isDisplayed) {
+          println(s"Adding form $form")
+          forms.append(form)
+        } else {
+          inputs.forEach(inp => {
+            val iName = inp.getAttribute("name")
+            println(s"Checking input $iName")
+
+            val vis = inp.isDisplayed && inp.isEnabled
+            if (vis && iName.contains("name") && !forms.contains(form)) {
+              println(s"Adding form $form")
+              forms.append(form)
+            }
+          })
+        }
       }
-    )
-    */
+    })
+    return forms
   }
 
   def addLink(url: String) {
@@ -98,6 +109,10 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
     if (href.contains("mailto:") || href.startsWith("tel:"))
       return false
 
+    // TODO: make this a setting. selenium doesn't handle tabs
+    // at all, so this has potential to fuck things up. one
+    // recommendation to fix is to mutate the target before clicking
+    // but you can't do that in scala/java AFAIK
     val tar = link.getAttribute("target")
     if (tar == "_new" || tar == "_blank")
       return false
@@ -161,13 +176,16 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
     return link
   }
 
-  def findInteractiveFormPage(depth: Int = 0) {
+  def crawlUntilCondition(stopCond: () => Boolean, depth: Int = 0) {
    var title = driver.getTitle
     println(s"findInteractiveFormPage Title: $title Depth: $depth")
     addLink(driver.getCurrentUrl)
 
     // check if url is a searchable interactive form
     // possibly use a ML model to decide in the future
+    if (stopCond()) {
+      return
+    }
 
     //driver.navigate.refresh()
     val byLinks: List[By] = extractPageLinks()
@@ -184,7 +202,7 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
 
          if(depth < MAX_DEPTH && clickLink(link)) {
            println(s"***** Clicked link $url")
-           findInteractiveFormPage(depth + 1)
+           crawlUntilCondition(stopCond, depth + 1)
            println("Going back...")
            driver.navigate.back()
           }
@@ -195,14 +213,32 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
     //driver.navigate.back()
   }
 
+  def goodFormsFound(): Boolean = {
+    var forms = scrapableForms()
+    return forms.size > 0
+  }
+
   def run() {
     println(s"Loading page $baseUrl")
     driver.get(baseUrl)
 
     // run findInteractiveFormPage, it will navigate to the page
     // with the proper form
-    findInteractiveFormPage()
-    println("Found searchable form")
+    crawlUntilCondition(goodFormsFound)
+
+    // var forms = scrapableForms()
+    // for (form <- forms) {
+    //   println(s"Form $form")
+    //   for (i <- inputs) {
+    //     val inp = form.findElement(By.tagName("input"))
+    //     println(s"Input $inp")
+    //     inp.sendKeys(i)
+    //     inp.submit()
+    //     Thread.sleep(1500)
+    //     driver.navigate.back()
+    //   }
+    // }
+
 
     // if there are multiple forms on the page, run the desiredFormInPage
     // which will determine which form to interact with
@@ -219,17 +255,13 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
     //      inside the page. but for now it's guaranteed to be faster
     //      and less noisy
 
-    var tag: By = By.tagName("body")
-    var element: WebElement = driver.findElement(tag)
-    var data: String = element.getAttribute("innerHTML")
-    var title: String = driver.getTitle
+    // var tag: By = By.tagName("body")
+    // var element: WebElement = driver.findElement(tag)
+    // var data: String = element.getAttribute("innerHTML")
+    // var title: String = driver.getTitle
 
-    for (i <- inputs)
-      println(s"Input $i")
+    // var forms = scrapableForms()
+    // print(s"Scrape forms $forms")
 
-    var form: String = desiredFormInPage()
-    println("form", form)
-
-    println(s"Title $title")
   }
 }
