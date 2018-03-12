@@ -159,14 +159,14 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
    * href is "//bxroberts.org" the result of getAttribute("href") will
    * return https://bxroberts.org/
    */
-  def extractPageLinks(): List[By] = {
-    var selectors: List[By] = List()
+  def extractPageLinks(): ListBuffer[By] = {
+    var selectors: ListBuffer[By] = ListBuffer()
     val links = driver.findElements(By.tagName("a"))
     links.forEach( link => {
       val href = getHref(link)
       if (goodLink(href, link)) {
         val selector = By.cssSelector(s"""a[href="${href}"]""")
-        selectors = selectors ++ List(selector)
+        selectors.append(selector)
       }
     })
     return selectors
@@ -205,7 +205,7 @@ class Crawl(baseUrl: String, conf: HashMap[String,String], driver: WebDriver) {
     }
 
     //driver.navigate.refresh()
-    val byLinks: List[By] = extractPageLinks()
+    val byLinks = extractPageLinks()
 
     for (by <- byLinks) {
       var link = findLink(by)
